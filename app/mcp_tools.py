@@ -151,18 +151,13 @@ def call_trusted_adult(reason: str, target: str, incident_id: int, spoken_summar
         res = {"allowed": False, "why": f"incident {incident_id} not in evidence log; call log_evidence first"}
         _trace("call_trusted_adult", reason, res)
         return res
-    worst = 0
-    for m in ROOM.messages:
-        if m.id in {x["id"] for x in incident["messages"]}:
-            cs = m.safety.get("content_safety", {})
-            worst = max(worst, cs.get("self_harm", 0) or 0, cs.get("violence", 0) or 0)
-            if "self_harm_push" in m.safety.get("lexicon", []) or "threat" in m.safety.get("lexicon", []):
-                worst = max(worst, IMMINENT_SEVERITY)
-    imminent = worst >= IMMINENT_SEVERITY
+    ids = {x["id"] for x in incident["messages"]}
+    imminent = any(detect.is_imminent(m) for m in ROOM.messages if m.id in ids)
+    worst = "imminent" if imminent else "below imminent threshold"
     if consent == "no" and not imminent:
         res = {"allowed": False, "why": f"{target} declined; respect it and keep offering support"}
     elif consent != "yes" and not imminent:
-        res = {"allowed": False, "why": f"no consent from {target} yet and no imminent risk (worst severity {worst})"}
+        res = {"allowed": False, "why": f"no consent from {target} yet and no imminent risk ({worst})"}
     else:
         basis = "consent" if consent == "yes" else "imminent_risk_override"
         call = notify.place_call(spoken_summary, incident_hash=incident["hash"])

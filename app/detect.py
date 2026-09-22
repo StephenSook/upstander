@@ -77,6 +77,16 @@ def analyze(m: Message) -> dict:
     return m.safety
 
 
+IMMINENT_SEVERITY = 4
+
+
+def is_imminent(m: Message) -> bool:
+    """Self-harm push or threat: the cases that justify telling an adult without waiting for consent."""
+    cs = m.safety.get("content_safety", {})
+    sev = max(cs.get("self_harm", 0) or 0, cs.get("violence", 0) or 0)
+    return sev >= IMMINENT_SEVERITY or bool({"self_harm_push", "threat"} & set(m.safety.get("lexicon", [])))
+
+
 def _target_of(m: Message, prev: list[Message]) -> str | None:
     """Who a message is aimed at: an explicit name, else second person right after someone spoke."""
     t = m.text.lower()
@@ -105,17 +115,23 @@ def pile_on(now: float | None = None) -> dict:
         m.safety["target"] = tgt
         if not (m.safety.get("hostile") and tgt):
             continue
-        d = by_target.setdefault(tgt, {"senders": set(), "message_ids": [], "max_severity": 0, "categories": set()})
+        d = by_target.setdefault(tgt, {"senders": set(), "message_ids": [], "max_severity": 0, "categories": set(),
+                                       "imminent": False})
         d["senders"].add(m.sender)
         d["message_ids"].append(m.id)
+        d["imminent"] = d["imminent"] or is_imminent(m)
         d["max_severity"] = max(d["max_severity"], m.safety.get("max_severity", 0))
         d["categories"].update(m.safety.get("lexicon", []))
     out = []
     for tgt, d in by_target.items():
         k = len(d["senders"])
         level = "pile_on" if k >= PILE_ON_SENDERS else ("forming" if k == 2 else "single")
-        out.append({"target": tgt, "distinct_hostile_senders": sorted(d["senders"]), "count": k,
-                    "level": level, "message_ids": d["message_ids"], "max_severity": d["max_severity"],
-                    "signals": sorted(d["categories"])})
+        row = {"target": tgt, "distinct_hostile_senders": sorted(d["senders"]), "count": k,
+               "level": level, "message_ids": d["message_ids"], "max_severity": d["max_severity"],
+               "signals": sorted(d["categories"]), "imminent_risk": d["imminent"]}
+        if d["imminent"]:
+            row["required_action"] = ("IMMINENT RISK (self-harm push or threat). Call log_evidence, then "
+                                      "call_trusted_adult NOW without waiting for consent, then tell the target privately.")
+        out.append(row)
     out.sort(key=lambda x: -x["count"])
     return {"window_seconds": WINDOW_SECONDS, "threshold_distinct_senders": PILE_ON_SENDERS, "targets": out}
