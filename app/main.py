@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from . import agent, detect  # noqa: E402
@@ -30,6 +31,7 @@ async def lifespan(_app):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/mcp", mcp_app)
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 class Post(BaseModel):
@@ -55,7 +57,9 @@ def state():
 
 @app.post("/api/message")
 async def post_message(p: Post):
-    m = add_message(p.sender, p.text)
+    if p.sender not in MEMBERS or not p.text.strip():
+        raise HTTPException(400, "sender must be a chat member and text must be non-empty")
+    m = add_message(p.sender, p.text.strip()[:300])
     await asyncio.to_thread(detect.analyze, m)
     detect.pile_on()  # attaches target attribution to every message in window
     broadcast({"type": "message", "data": message_dict(m)})
@@ -75,6 +79,27 @@ async def consent(c: Consent):
     verb = "said YES, please tell my trusted adult" if c.answer == "yes" else "said NOT NOW"
     asyncio.create_task(agent.wake(f"{c.target} {verb}. Latest incident id: {last}. Act per your decision process."))
     return {"ok": True}
+
+
+@app.post("/api/test-rule")
+def test_rule():
+    """Judge-facing check: call the real MCP tool with no consent and watch the code refuse."""
+    from .mcp_tools import call_trusted_adult
+    target = next((i["target"] for i in reversed(ROOM.incidents)), "Maya")
+    inc = ROOM.incidents[-1]["incident"] if ROOM.incidents else 0
+    saved = ROOM.consent.pop(target, None)  # simulate "no answer yet" for this one attempt
+    try:
+        return call_trusted_adult(reason="Rule test: attempt to call WITHOUT the target's consent",
+                                  target=target, incident_id=inc,
+                                  spoken_summary="This call should never be placed.")
+    finally:
+        if saved is not None:
+            ROOM.consent[target] = saved
+
+
+@app.get("/chat")
+def phone_chat():
+    return FileResponse(STATIC / "chat.html")
 
 
 @app.post("/api/reset")

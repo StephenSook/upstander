@@ -64,6 +64,12 @@ section h2 small{font-weight:400;color:var(--muted);font-size:16px;margin-left:6
 .dm .acts{display:flex;gap:8px;margin-top:8px}
 .dm .acts .btn{background:var(--green)}
 .empty{color:var(--muted);font-size:17px}
+#qr{position:fixed;inset:0;background:rgba(19,35,58,.72);display:flex;align-items:center;justify-content:center;z-index:9}
+#qr[hidden]{display:none}
+#qr>div{background:#fff;border-radius:18px;padding:24px;text-align:center;max-width:420px}
+#qr img{width:340px;height:340px;image-rendering:pixelated}
+#qr p{font-size:22px;margin:10px 0 14px}
+#qrbtn{margin-left:14px}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
@@ -73,6 +79,10 @@ section h2 small{font-weight:400;color:var(--muted);font-size:16px;margin-left:6
   <h1>Upstander</h1>
   <p>An agent that notices when a group chat turns on one kid, and gets them a trusted adult.</p>
   <div class="status" id="status"><span class="dot"></span>Agent idle</div>
+  <button class="btn ghost" id="qrbtn" aria-expanded="false">Join from your phone</button>
+</header>
+<div id="qr" hidden><div><img src="/static/qr.png" alt="QR code to join the group chat from a phone"><p>Scan to join the group chat. Pick a name, then type.</p><button class="btn" id="qrclose">Close</button></div></div>
+<header hidden>
 </header>
 <main>
   <section aria-label="Group chat">
@@ -81,7 +91,7 @@ section h2 small{font-weight:400;color:var(--muted);font-size:16px;margin-left:6
     <div class="composer">
       <div class="who-row" id="who"></div>
       <form class="send-row" id="form"><input id="text" autocomplete="off" placeholder="Message the group" aria-label="Message"><button class="btn">Send</button></form>
-      <div class="ctrl"><button class="btn ghost" id="play">Play scenario</button><button class="btn ghost" id="reset">Reset</button></div>
+      <div class="ctrl"><button class="btn ghost" id="play">Play scenario</button><button class="btn ghost" id="rule">Try calling without consent</button><button class="btn ghost" id="reset">Reset</button></div>
     </div>
   </section>
   <section aria-label="Agent reasoning">
@@ -122,7 +132,7 @@ const LABEL={get_recent_messages:"Read the chat",score_pile_on:"Scored the pile-
 function drawConverge(t){const svg=$("converge");if(!t){svg.innerHTML="";return}
   const cx=210,cy=110,others=MEMBERS.filter(m=>m!==t.target),hostile=new Set(t.distinct_hostile_senders);
   let h=`<circle cx="${cx}" cy="${cy}" r="38" fill="${t.level==="pile_on"?"#D6453D":"#F2B705"}"/><text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">${esc(t.target)}</text>`;
-  others.forEach((m,i)=>{const a=Math.PI*(1.1+i*0.8/ (others.length-1||1)*1.0)+ (i*Math.PI*1.8/others.length);const x=cx+165*Math.cos(a),y=cy+85*Math.sin(a);
+  others.forEach((m,i)=>{const a=(-135+i*360/others.length)*Math.PI/180;const x=cx+150*Math.cos(a),y=cy+68*Math.sin(a);
     const on=hostile.has(m);if(on)h=`<line x1="${x}" y1="${y}" x2="${cx}" y2="${cy}" stroke="#D6453D" stroke-width="4" stroke-dasharray="300" stroke-dashoffset="300"><animate attributeName="stroke-dashoffset" to="0" dur=".6s" fill="freeze"/></line>`+h;
     h+=`<circle cx="${x}" cy="${y}" r="26" fill="${on?"#13233A":"#fff"}" stroke="#C9D6E3" stroke-width="2"/><text x="${x}" y="${y+6}" text-anchor="middle" font-size="16" font-weight="700" fill="${on?"#fff":"#5A6B80"}">${esc(m)}</text>`});
   svg.innerHTML=h;const L=$("level");L.className="level "+t.level;
@@ -151,6 +161,9 @@ load();connect();
 async function send(sender,text){await fetch("/api/message",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sender,text})})}
 $("form").onsubmit=e=>{e.preventDefault();const t=$("text").value.trim();if(t){send(me,t);$("text").value=""}};
 $("reset").onclick=()=>fetch("/api/reset",{method:"POST"});
+$("qrbtn").onclick=()=>{$("qr").hidden=false;$("qrbtn").setAttribute("aria-expanded","true")};
+$("qrclose").onclick=()=>{$("qr").hidden=true;$("qrbtn").setAttribute("aria-expanded","false")};
+$("rule").onclick=()=>fetch("/api/test-rule",{method:"POST"});
 const SCENARIO=[["Maya","omg I finally got bangs 😅"],["Jay","lol look at Maya's hair 💀"],["Tre","nobody asked Maya"],["Kai","fr just leave the gc maya nobody invited u"],["Ava","guys chill"]];
 $("play").onclick=async()=>{for(const[s,t]of SCENARIO){await send(s,t);await new Promise(r=>setTimeout(r,1800))}};
 </script>
