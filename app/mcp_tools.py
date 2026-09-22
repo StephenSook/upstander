@@ -145,6 +145,13 @@ def call_trusted_adult(reason: str, target: str, incident_id: int, spoken_summar
     """Place a REAL phone call to the target's trusted adult and read a short spoken summary.
     Allowed only if the target said yes, or Content Safety shows imminent risk (self-harm or violence >= 4).
     The spoken summary must not include slurs or the full messages; name the pattern and the next step."""
+    recent = next((c for c in reversed(ROOM.calls)
+                   if c["target"] == target and c.get("placed") and time.time() - c.get("at", 0) < 600), None)
+    if recent:
+        res = {"allowed": False, "why": f"{target}'s trusted adult was already called {int(time.time() - recent['at'])}s ago; "
+                                        "one call per incident so the adult is not flooded"}
+        _trace("call_trusted_adult", reason, res)
+        return res
     consent = ROOM.consent.get(target)
     incident = next((i for i in ROOM.incidents if i["incident"] == incident_id), None)
     if incident is None:
@@ -161,7 +168,7 @@ def call_trusted_adult(reason: str, target: str, incident_id: int, spoken_summar
     else:
         basis = "consent" if consent == "yes" else "imminent_risk_override"
         call = notify.place_call(spoken_summary, incident_hash=incident["hash"])
-        rec = {"target": target, "incident": incident_id, "basis": basis, **call}
+        rec = {"target": target, "incident": incident_id, "basis": basis, "at": time.time(), **call}
         ROOM.calls.append(rec)
         broadcast({"type": "call", "data": rec})
         if basis == "imminent_risk_override":
