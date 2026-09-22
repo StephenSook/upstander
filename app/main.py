@@ -61,12 +61,13 @@ async def post_message(p: Post):
         raise HTTPException(400, "sender must be a chat member and text must be non-empty")
     m = add_message(p.sender, p.text.strip()[:300])
     await asyncio.to_thread(detect.analyze, m)
-    detect.pile_on()  # attaches target attribution to every message in window
+    score = detect.pile_on()  # attaches target attribution to every message in window
     broadcast({"type": "message", "data": message_dict(m)})
+    broadcast({"type": "pile_on", "data": score})  # diagram updates live, not only when the agent re-scores
     if m.safety.get("hostile"):
-        asyncio.create_task(agent.wake(
         urgent = ("IMMINENT RISK: this message is a self-harm push or a threat. Escalate per step 3d. "
                   if detect.is_imminent(m) else "")
+        asyncio.create_task(agent.wake(
             f"{urgent}New message #{m.id} from {m.sender} in the group chat flagged by signals "
             f"{m.safety.get('lexicon')} and Content Safety max severity {m.safety.get('max_severity')}. "
             "Investigate and act per your decision process."))
