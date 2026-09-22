@@ -6,3 +6,5 @@ data/*.jsonl
 *.log
 .DS_Store
 scratch_*
+docs/
+app/static/qr.png
