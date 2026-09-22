@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upstander</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#EAF1F7;--ink:#13233A;--muted:#5A6B80;--green:#1E8E5A;--amber:#F2B705;--red:#D6453D;--card:#FFFFFF;--line:#C9D6E3}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:18px}
+header{display:flex;align-items:baseline;gap:18px;padding:14px 24px 6px}
+header h1{margin:0;font-size:34px;letter-spacing:-.5px}
+header p{margin:0;color:var(--muted);font-size:18px}
+header .status{margin-left:auto;font-weight:700;font-size:18px}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--muted);margin-right:8px;vertical-align:middle}
+.dot.think{background:var(--amber);animation:pulse 1s infinite}.dot.done{background:var(--green)}.dot.err{background:var(--red)}
+@keyframes pulse{50%{opacity:.3}}
+main{display:grid;grid-template-columns:1fr 1.05fr 1fr;gap:18px;padding:8px 24px 18px;height:calc(100% - 64px)}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:0}
+section h2{font-size:20px;margin:0;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+section h2 small{font-weight:400;color:var(--muted);font-size:16px;margin-left:6px}
+.scroll{overflow-y:auto;flex:1;padding:12px 14px;min-height:0}
+/* chat */
+.msg{margin:0 0 10px;max-width:88%}
+.msg .who{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 2px 4px}
+.msg .b{background:#EEF3F8;border-radius:16px;padding:9px 13px;font-size:21px;line-height:1.3;display:inline-block}
+.msg.hostile .b{background:linear-gradient(transparent 58%,rgba(242,183,5,.55) 58%),#EEF3F8}
+.msg .tags{font-size:14px;color:var(--muted);margin:3px 0 0 6px}
+.msg .tags b{color:var(--red)}
+.composer{border-top:1px solid var(--line);padding:10px}
+.who-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.who-row button{font:inherit;font-size:16px;border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:4px 12px;cursor:pointer}
+.who-row button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.send-row{display:flex;gap:8px}
+.send-row input{flex:1;font:inherit;font-size:19px;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px}
+.btn{font:inherit;font-weight:700;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--ink);color:#fff}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn:focus-visible,.who-row button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.ctrl{display:flex;gap:8px;margin-top:8px}
+/* trace */
+.step{border-left:4px solid var(--green);padding:6px 0 8px 12px;margin-bottom:10px}
+.step .tool{font-weight:700;font-size:20px}
+.step .why{font-size:18px;margin:2px 0}
+.step .res{font-size:15px;color:var(--muted);word-break:break-word}
+.step.blocked{border-color:var(--red)}
+.step.final{border-color:var(--ink);background:#F4F7FA;border-radius:0 8px 8px 0}
+.step.err{border-color:var(--red);color:var(--red)}
+/* right */
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:0}
+#converge{width:100%;height:210px;display:block}
+.level{padding:0 16px 10px;font-size:20px;font-weight:700}
+.level.pile_on{color:var(--red)}.level.forming{color:#A37800}
+.evidence{padding:8px 16px 12px;border-top:1px solid var(--line);font-size:16px}
+.evidence code{font-size:15px;background:#F1F5F9;padding:1px 5px;border-radius:5px}
+.call{margin:0 16px 10px;padding:12px 14px;border-radius:12px;background:#F4F7FA;font-size:19px;font-weight:700;display:none}
+.call.on{display:block;background:var(--green);color:#fff;animation:ring .5s 6 alternate}
+@keyframes ring{to{transform:translateX(4px)}}
+.dms{border-top:1px solid var(--line)}
+.dm{margin-bottom:10px;padding:9px 12px;border-radius:12px;background:#F4F7FA;font-size:18px}
+.dm .to{font-size:14px;font-weight:700;color:var(--muted)}
+.dm.checkin{background:#E6F4EC;border:1.5px solid var(--green)}
+.dm .acts{display:flex;gap:8px;margin-top:8px}
+.dm .acts .btn{background:var(--green)}
+.empty{color:var(--muted);font-size:17px}
+@media (max-width:900px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Upstander</h1>
+  <p>An agent that notices when a group chat turns on one kid, and gets them a trusted adult.</p>
+  <div class="status" id="status"><span class="dot"></span>Agent idle</div>
+</header>
+<main>
+  <section aria-label="Group chat">
+    <h2>8th grade gc <small>5 members</small></h2>
+    <div class="scroll" id="chat"><p class="empty">Nothing yet. Pick a person below and type, or play the scenario.</p></div>
+    <div class="composer">
+      <div class="who-row" id="who"></div>
+      <form class="send-row" id="form"><input id="text" autocomplete="off" placeholder="Message the group" aria-label="Message"><button class="btn">Send</button></form>
+      <div class="ctrl"><button class="btn ghost" id="play">Play scenario</button><button class="btn ghost" id="reset">Reset</button></div>
+    </div>
+  </section>
+  <section aria-label="Agent reasoning">
+    <h2>What the agent is doing <small>Foundry agent, tools over MCP</small></h2>
+    <div class="scroll" id="trace"><p class="empty">Each tool call appears here with the agent's reason for making it.</p></div>
+  </section>
+  <section class="right" aria-label="Incident">
+    <div>
+      <h2>Who is being targeted <small>distinct senders, 10 min window</small></h2>
+      <svg id="converge" viewBox="0 0 420 210" role="img" aria-label="Pile-on diagram"></svg>
+      <div class="level" id="level">No pile-on detected</div>
+      <div class="call" id="call"></div>
+    </div>
+    <div class="evidence" id="evidence">Evidence log: empty</div>
+    <div class="dms scroll" id="dms"><p class="empty">Private messages from the agent show here. Nobody else in the chat sees them.</p></div>
+  </section>
+</main>
+<script>
+const MEMBERS=["Maya","Jay","Tre","Kai","Ava"];let me="Jay";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function renderWho(){$("who").innerHTML=MEMBERS.map(m=>`<button type="button" aria-pressed="${m===me}" data-m="${m}">${m}</button>`).join("");
+  $("who").querySelectorAll("button").forEach(b=>b.onclick=()=>{me=b.dataset.m;renderWho();$("text").focus()})}
+renderWho();
+function clearEmpty(el){const e=el.querySelector(".empty");if(e)e.remove()}
+function addMsg(m){clearEmpty($("chat"));const s=m.safety||{};const cs=s.content_safety||{};
+  const sev=Object.entries(cs).filter(([k,v])=>k!=="error"&&v>0).map(([k,v])=>`${k.replace("_"," ")} ${v}`);
+  const tags=[...(s.lexicon||[]),...sev];
+  const d=document.createElement("div");d.className="msg"+(s.hostile?" hostile":"");
+  d.innerHTML=`<p class="who">${esc(m.sender)}</p><div class="b">${esc(m.text)}</div>`+(tags.length?`<p class="tags">${s.hostile?"<b>flagged</b> ":""}${esc(tags.join(", "))}</p>`:"");
+  $("chat").appendChild(d);$("chat").scrollTop=1e9}
+function addStep(cls,title,why,res){clearEmpty($("trace"));const d=document.createElement("div");d.className="step "+cls;
+  d.innerHTML=`<div class="tool">${esc(title)}</div>${why?`<div class="why">${esc(why)}</div>`:""}${res?`<div class="res">${esc(typeof res==="string"?res:JSON.stringify(res))}</div>`:""}`;
+  $("trace").appendChild(d);$("trace").scrollTop=1e9}
+const LABEL={get_recent_messages:"Read the chat",score_pile_on:"Scored the pile-on",analyze_text_safety:"Checked with Content Safety",
+ lookup_guidance:"Looked up guidance",log_evidence:"Saved evidence",send_private_nudge:"Nudged a sender privately",
+ check_in_with_target:"Checked in with the target",call_trusted_adult:"Called the trusted adult"};
+function drawConverge(t){const svg=$("converge");if(!t){svg.innerHTML="";return}
+  const cx=210,cy=110,others=MEMBERS.filter(m=>m!==t.target),hostile=new Set(t.distinct_hostile_senders);
+  let h=`<circle cx="${cx}" cy="${cy}" r="38" fill="${t.level==="pile_on"?"#D6453D":"#F2B705"}"/><text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">${esc(t.target)}</text>`;
+  others.forEach((m,i)=>{const a=Math.PI*(1.1+i*0.8/ (others.length-1||1)*1.0)+ (i*Math.PI*1.8/others.length);const x=cx+165*Math.cos(a),y=cy+85*Math.sin(a);
+    const on=hostile.has(m);if(on)h=`<line x1="${x}" y1="${y}" x2="${cx}" y2="${cy}" stroke="#D6453D" stroke-width="4" stroke-dasharray="300" stroke-dashoffset="300"><animate attributeName="stroke-dashoffset" to="0" dur=".6s" fill="freeze"/></line>`+h;
+    h+=`<circle cx="${x}" cy="${y}" r="26" fill="${on?"#13233A":"#fff"}" stroke="#C9D6E3" stroke-width="2"/><text x="${x}" y="${y+6}" text-anchor="middle" font-size="16" font-weight="700" fill="${on?"#fff":"#5A6B80"}">${esc(m)}</text>`});
+  svg.innerHTML=h;const L=$("level");L.className="level "+t.level;
+  L.textContent=t.level==="pile_on"?`Pile-on: ${t.count} kids on ${t.target}`:t.level==="forming"?`Forming: ${t.count} kids on ${t.target}`:`One hostile sender toward ${t.target}`}
+function addDM(e){clearEmpty($("dms"));const d=document.createElement("div");d.className="dm "+e.kind;
+  d.innerHTML=`<div class="to">Private to ${esc(e.to)}</div>${esc(e.text)}`+(e.kind==="checkin"?`<div class="acts"><button class="btn" data-a="yes">Yes, tell ${esc(e.adult)}</button><button class="btn ghost" data-a="no">Not now</button></div>`:"");
+  d.querySelectorAll("button[data-a]").forEach(b=>b.onclick=async()=>{d.querySelector(".acts").innerHTML=`<b>${esc(e.to)} answered: ${b.dataset.a==="yes"?"yes":"not now"}</b>`;
+    await fetch("/api/consent",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({target:e.to,answer:b.dataset.a})})});
+  $("dms").prepend(d)}
+function status(state,text){const s=$("status");const cls={thinking:"think",done:"done",error:"err"}[state]||"";
+  s.innerHTML=`<span class="dot ${cls}"></span>${state==="thinking"?"Agent thinking":state==="error"?"Agent error":"Agent idle"}`}
+function connect(){const ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onmessage=ev=>{const e=JSON.parse(ev.data);
+    if(e.type==="message")addMsg(e.data);
+    else if(e.type==="trace"){const blocked=e.tool==="call_trusted_adult"&&e.result&&e.result.allowed===false;addStep(blocked?"blocked":"",(LABEL[e.tool]||e.tool)+(blocked?" (blocked by rule)":""),e.reason,e.result)}
+    else if(e.type==="pile_on")drawConverge(e.data.targets[0]);
+    else if(e.type==="evidence")$("evidence").innerHTML=`Evidence log: incident ${e.data.incident_id}, ${e.data.messages_stored} messages, SHA-256 <code>${esc(e.data.hash.slice(0,16))}</code>, chain ${e.data.chain.valid?"verified":"BROKEN"} (${e.data.chain.entries} entries)`;
+    else if(e.type==="dm")addDM(e);
+    else if(e.type==="call"){const c=$("call");c.className="call on";c.textContent=e.data.placed?`Calling trusted adult now (phone ending ${e.data.to_last4}), basis: ${e.data.basis.replace(/_/g," ")}`:`Call failed: ${e.data.error}`}
+    else if(e.type==="consent")addStep("","Consent received",`${e.target} answered ${e.answer==="yes"?"yes":"not now"}`,"");
+    else if(e.type==="agent"){status(e.state);if(e.state==="done"&&e.text)addStep("final","Agent summary",e.text,"");if(e.state==="error")addStep("err","Agent error",e.text,"")}
+    else if(e.type==="reset")location.reload()};
+  ws.onclose=()=>setTimeout(connect,1000)}
+async function load(){const s=await (await fetch("/api/state")).json();s.messages.forEach(addMsg)}
+load();connect();
+async function send(sender,text){await fetch("/api/message",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sender,text})})}
+$("form").onsubmit=e=>{e.preventDefault();const t=$("text").value.trim();if(t){send(me,t);$("text").value=""}};
+$("reset").onclick=()=>fetch("/api/reset",{method:"POST"});
+const SCENARIO=[["Maya","omg I finally got bangs 😅"],["Jay","lol look at Maya's hair 💀"],["Tre","nobody asked Maya"],["Kai","fr just leave the gc maya nobody invited u"],["Ava","guys chill"]];
+$("play").onclick=async()=>{for(const[s,t]of SCENARIO){await send(s,t);await new Promise(r=>setTimeout(r,1800))}};
+</script>
+</body>
+</html>
