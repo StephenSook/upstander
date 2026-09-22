@@ -65,7 +65,9 @@ async def post_message(p: Post):
     broadcast({"type": "message", "data": message_dict(m)})
     if m.safety.get("hostile"):
         asyncio.create_task(agent.wake(
-            f"New message #{m.id} from {m.sender} in the group chat flagged by signals "
+        urgent = ("IMMINENT RISK: this message is a self-harm push or a threat. Escalate per step 3d. "
+                  if detect.is_imminent(m) else "")
+            f"{urgent}New message #{m.id} from {m.sender} in the group chat flagged by signals "
             f"{m.safety.get('lexicon')} and Content Safety max severity {m.safety.get('max_severity')}. "
             "Investigate and act per your decision process."))
     return message_dict(m)
