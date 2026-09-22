@@ -50,6 +50,7 @@ def _client():
     raise RuntimeError("FOUNDRY_PROJECT_ENDPOINT not set")
 
 
+RUN_TIMEOUT = 45  # a hung model call must never hold the lock for the rest of the demo
 _lock = asyncio.Lock()
 _pending: str | None = None
 
@@ -74,7 +75,39 @@ async def _run(event: str) -> None:
         async with MCPStreamableHTTPTool(name="upstander", url=f"http://127.0.0.1:{port}/mcp/",
                                          request_timeout=60) as mcp_tool:
             agent = Agent(client=_client(), name="Upstander", instructions=INSTRUCTIONS, tools=[mcp_tool])
-            result = await agent.run(event)
+            result = await asyncio.wait_for(agent.run(event), timeout=RUN_TIMEOUT)
         broadcast({"type": "agent", "state": "done", "text": result.text})
+    except asyncio.TimeoutError:
+        broadcast({"type": "agent", "state": "error",
+                   "text": f"Agent run exceeded {RUN_TIMEOUT}s; safety checks ran anyway."})
     except Exception as e:
         broadcast({"type": "agent", "state": "error", "text": f"{type(e).__name__}: {str(e)[:300]}"})
+    _safety_net()
+
+
+def _safety_net() -> None:
+    """Deterministic backstop: imminent risk must never depend on the model remembering a rule.
+    If an imminent-risk target has an incident on file and no call was placed, the system calls."""
+    from . import detect, mcp_tools
+    from .state import ROOM
+    for t in detect.pile_on()["targets"]:
+        tgt = t["target"]
+        if not t["imminent_risk"] or any(c["target"] == tgt and c.get("placed") for c in ROOM.calls):
+            continue
+        ids = set(t["message_ids"])
+        inc = next((i for i in reversed(ROOM.incidents)
+                    if i["target"] == tgt and ids & {m["id"] for m in i["messages"]}), None)
+        if inc is None:
+            inc = mcp_tools.log_evidence(reason="Safety net: imminent risk with no evidence on file",
+                                         target=tgt, message_ids=sorted(ids),
+                                         summary="Imminent risk: self-harm push or threat in a pile-on")
+            inc_id = inc["incident_id"]
+        else:
+            inc_id = inc["incident"]
+        n = t["count"]
+        mcp_tools.call_trusted_adult(
+            reason="Safety net: imminent risk detected and the agent had not escalated",
+            target=tgt, incident_id=inc_id,
+            spoken_summary=(f"{tgt} is being targeted in a group chat by {n} "
+                            f"{'kids' if n != 1 else 'kid'}, including a message telling them to hurt "
+                            f"themselves or a threat of a fight. Please check on {tgt} today."))
