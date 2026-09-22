@@ -30,19 +30,29 @@ const MEMBERS=["Maya","Jay","Tre","Kai","Ava"];let me=null;const $=i=>document.g
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 $("names").innerHTML=MEMBERS.map(m=>`<button data-m="${m}">${m}</button>`).join("");
 $("names").querySelectorAll("button").forEach(b=>b.onclick=()=>start(b.dataset.m));
+const seenMsg=new Set(),seenDM=new Set();
 function add(html){$("log").insertAdjacentHTML("beforeend",html);$("log").scrollTop=1e9}
-function msg(m){add(`<div class="m ${m.sender===me?"me":""}"><p class="w">${esc(m.sender)}</p><div class="b">${esc(m.text)}</div></div>`)}
-async function start(name){me=name;$("pick").style.display="none";$("app").style.display="flex";$("me").textContent="you are "+name;
-  const s=await (await fetch("/api/state")).json();s.messages.forEach(msg);connect()}
+function msg(m){if(seenMsg.has(m.id))return;seenMsg.add(m.id);
+  add(`<div class="m ${m.sender===me?"me":""}"><p class="w">${esc(m.sender)}</p><div class="b">${esc(m.text)}</div></div>`)}
+function dm(e,answered){if(e.to!==me||seenDM.has(e.id))return;seenDM.add(e.id);const id="d"+e.id;
+  const ask=e.kind==="checkin"?(answered?`<div><b>You answered: ${answered==="yes"?"yes":"not now"}</b></div>`:
+    `<div><button data-a="yes">Yes, tell ${esc(e.adult)}</button><button class="n" data-a="no">Not now</button></div>`):"";
+  add(`<div class="dm" id="${id}"><b>Private from Upstander</b>${esc(e.text)}${ask}</div>`);
+  if(navigator.vibrate)navigator.vibrate(200);
+  document.querySelectorAll(`#${id} button`).forEach(b=>b.onclick=async()=>{b.parentElement.innerHTML="<b>Answer sent</b>";
+    await fetch("/api/consent",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({target:me,answer:b.dataset.a})})})}
+async function sync(){const s=await (await fetch("/api/state")).json();s.messages.forEach(msg);
+  const d=await (await fetch("/api/dms?to="+encodeURIComponent(me))).json();d.dms.forEach(x=>dm(x,d.answered))}
+async function start(name){me=name;$("pick").style.display="none";$("app").style.display="flex";$("me").textContent="you are "+name;await sync();connect()}
 function connect(){const ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onopen=()=>sync();
   ws.onmessage=ev=>{const e=JSON.parse(ev.data);
     if(e.type==="message")msg(e.data);
-    else if(e.type==="dm"&&e.to===me){const id="d"+Date.now();
-      add(`<div class="dm" id="${id}"><b>Private from Upstander</b>${esc(e.text)}${e.kind==="checkin"?`<div><button data-a="yes">Yes, tell ${esc(e.adult)}</button><button class="n" data-a="no">Not now</button></div>`:""}</div>`);
-      document.querySelectorAll(`#${id} button`).forEach(b=>b.onclick=async()=>{b.parentElement.innerHTML="<b>Answer sent</b>";
-        await fetch("/api/consent",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({target:me,answer:b.dataset.a})})})}
+    else if(e.type==="dm")dm(e,null);
     else if(e.type==="reset")location.reload()};
   ws.onclose=()=>setTimeout(connect,1000)}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me)sync()});
+setInterval(()=>{if(me)sync()},4000);
 $("f").onsubmit=async e=>{e.preventDefault();const t=$("t").value.trim();if(!t)return;$("t").value="";
   await fetch("/api/message",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sender:me,text:t.slice(0,300)})})};
 </script></body></html>

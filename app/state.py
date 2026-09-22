@@ -33,6 +33,7 @@ class Room:
     calls: list[dict] = field(default_factory=list)
     nudged: set[str] = field(default_factory=set)
     asked: set[str] = field(default_factory=set)
+    dms: list[dict] = field(default_factory=list)
 
 
 ROOM = Room()
@@ -52,6 +53,9 @@ def unsubscribe(q: asyncio.Queue) -> None:
 
 def broadcast(event: dict) -> None:
     event.setdefault("ts", time.time())
+    if event.get("type") == "dm":  # keep private messages so a phone that joins late still gets them
+        event.setdefault("id", len(ROOM.dms) + 1)
+        ROOM.dms.append(event)
     for q in list(_subscribers):
         q.put_nowait(event)
 
@@ -72,6 +76,7 @@ def reset() -> None:
     ROOM.calls.clear()
     ROOM.nudged.clear()
     ROOM.asked.clear()
+    ROOM.dms.clear()
     _next_id = 1
     broadcast({"type": "reset"})
 

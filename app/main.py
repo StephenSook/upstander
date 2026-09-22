@@ -81,6 +81,12 @@ async def consent(c: Consent):
     return {"ok": True}
 
 
+@app.get("/api/dms")
+def dms(to: str):
+    """Private messages for one member, plus whether their consent question is already answered."""
+    return {"dms": [d for d in ROOM.dms if d.get("to") == to], "answered": ROOM.consent.get(to)}
+
+
 @app.post("/api/test-rule")
 def test_rule():
     """Judge-facing check: call the real MCP tool with no consent and watch the code refuse."""
